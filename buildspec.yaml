@@ -1,0 +1,68 @@
+version: 0.2
+phases:
+  pre_build:
+    commands: 
+      - mv .env.example .env.$NODEENV 
+      - sed -i "s|WEBSITEURL|https://$WEBSITEURL|g" .env.$NODEENV
+      - sed -i "s/NODEENV/$NODEENV/g" .env.$NODEENV 
+      - sed -i "s/APP_PORT/$APP_PORT/g" .env.$NODEENV 
+      - sed -i "s/DBUSER/$DBUSER/g" .env.$NODEENV 
+      - sed -i "s/DBNAME/$DBNAME/g" .env.$NODEENV 
+      - sed -i "s/DBHOST/$DBHOST/g" .env.$NODEENV 
+      - sed -i "s/DBPASS/$DBPASS/g" .env.$NODEENV 
+      - sed -i "s/TWILIOACCOUNTSID/$TWILIOACCOUNTSID/g" .env.$NODEENV 
+      - sed -i "s/TWILIOAUTHTOKEN/$TWILIOAUTHTOKEN/g" .env.$NODEENV 
+      - sed -i "s/TOTESTEMAIL/$TOTESTEMAIL/g" .env.$NODEENV 
+      - sed -i "s/TOCCEMAIL/$TOCCEMAIL/g" .env.$NODEENV 
+      - sed -i "s/IOSMINVERSION/$IOSMINVERSION/g" .env.$NODEENV 
+      - sed -i "s/IOSVERSION/$IOSVERSION/g" .env.$NODEENV 
+      - sed -i "s/ANDROIDMINVERSION/$ANDROIDMINVERSION/g" .env.$NODEENV 
+      - sed -i "s/ANDROIDVERSION/$ANDROIDVERSION/g" .env.$NODEENV 
+      - sed -i "s/SENDGRIDAPIKEY/$SENDGRIDAPIKEY/g" .env.$NODEENV 
+      - sed -i "s/SENDGRIDFROM/$SENDGRIDFROM/g" .env.$NODEENV 
+      - sed -i "s/JWTSECRETKEY/$JWTSECRETKEY/g" .env.$NODEENV
+      - sed -i "s#REDISSERVER#$REDISSERVER#g" .env.$NODEENV 
+      - sed -i "s#AWSDATASETSECRETKEY#$AWSDATASETSECRETKEY#g" .env.$NODEENV 
+      - sed -i "s#AWSDATASETACCESSKEY#$AWSDATASETACCESSKEY#g" .env.$NODEENV 
+      - sed -i "s/AWSREGION/$AWSREGION/g" .env.$NODEENV 
+      - sed -i "s/AWSBUCKET/$AWSBUCKET/g" .env.$NODEENV 
+      - sed -i "s/LAMBDAACCESSKEY/$LAMBDAACCESSKEY/g" .env.$NODEENV
+      - sed -i "s#LAMBDASECRETKEY#$LAMBDASECRETKEY#g" .env.$NODEENV
+      - sed -i "s|AWSCLOUDFRONTURL|https://$AWSCLOUDFRONTURL|g" .env.$NODEENV 
+      - sed -i "s|AWSPUBLICURL|https://$AWSPUBLICURL/|g" .env.$NODEENV 
+      - sed -i "s/ROLLBARACCESSTOKEN/$ROLLBARACCESSTOKEN/g" .env.$NODEENV 
+      - sed -i "s/ROLL_BAR/$ROLL_BAR/g" .env.$NODEENV    
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - echo $AWS_DEFAULT_REGION
+      - $(aws ecr get-login --region ap-south-1 --no-include-email)
+      - REPOSITORY_URI=884516867688.dkr.ecr.us-west-2.amazonaws.com/$ECR_REPO #tobechanged
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 2-8)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image..
+      - echo $DOCKERHUB_PASSWORD | docker login --username $DOCKERHUB_USERNAME --password-stdin
+      - docker build -t $REPOSITORY_URI:latest .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - printf '[{"name":"pegdesk-node-staging-ecs","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+      - printf '{"ImageURI":"%s"}' $REPOSITORY_URI:$IMAGE_TAG > imageDetail.json
+artifacts:
+  files:
+    - 'image*.json'
+    - 'appspec.yaml'
+    - 'taskdef.json'
+  secondary-artifacts:
+    DefinitionArtifact:
+      files:
+        - appspec.yaml
+        - taskdef.json
+    ImageArtifact:
+      files:
+        - imageDetail.json
